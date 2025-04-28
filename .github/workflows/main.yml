@@ -1,3 +1,4 @@
+# .github/workflows/docker-publish.yml
 name: Build UI & Push Docker Image
 on:
  push:
@@ -6,42 +7,37 @@ jobs:
  build-and-push:
    runs-on: ubuntu-latest
    steps:
-   # 1) Kod ve submodule'ları çek
    - name: Checkout repo (with submodules)
      uses: actions/checkout@v4
      with:
        submodules: recursive
-   # 2) Ön yüzü derleyen temporary imajı build et
    - name: Build UI-builder image
+     working-directory: excalidraw
      run: |
-       cd excalidraw-complete/excalidraw
        git checkout tags/v0.17.3
-       # eğer patch’in varsa:
-       # git apply ../frontend.patch
+       # Eğer reverse-proxy patch'in varsa:
+       git apply ../frontend.patch || true
+       # jcobol fix branch'ini de çekmek istersen:
        git remote add jcobol https://github.com/jcobol/excalidraw
        git fetch jcobol
        git checkout 7582_fix_docker_build
-       docker build -t excalidraw-ui-build . -f ui-build.Dockerfile
-   # 3) Oluşan /frontend klasörünü çek
+       # UI build için Docker image
+       docker build -t ui-builder . -f ui-build.Dockerfile
    - name: Extract frontend static files
      run: |
-       # workspace içinde var olacak frontend klasörünü sil/oluştur
-       rm -rf $GITHUB_WORKSPACE/frontend
-       mkdir -p $GITHUB_WORKSPACE/frontend
+       rm -rf frontend
+       mkdir frontend
        docker run --rm \
-         -v $GITHUB_WORKSPACE/frontend:/pwd \
-         -it excalidraw-ui-build \
+         -v ${{ github.workspace }}/frontend:/pwd \
+         ui-builder \
          cp -r /frontend /pwd
-   # 4) Docker Buildx’i hazırla
    - name: Set up Docker Buildx
      uses: docker/setup-buildx-action@v3
-   # 5) DockerHub’a login ol
    - name: Login to DockerHub
      uses: docker/login-action@v3
      with:
        username: ${{ secrets.DOCKER_USERNAME }}
        password: ${{ secrets.DOCKER_PASSWORD }}
-   # 6) Final imajı build et ve pushla
    - name: Build and Push final image
      uses: docker/build-push-action@v5
      with:
