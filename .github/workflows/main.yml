@@ -1,46 +1,45 @@
-# .github/workflows/docker-publish.yml
-name: Build UI & Push Docker Image
+name: Build UI & Push Docker image
 on:
  push:
-   branches: [ dev ]
+   branches: [ dev ]        # başka branch kullanıyorsan değiştir
 jobs:
- build-and-push:
+ docker:
    runs-on: ubuntu-latest
    steps:
-   - name: Checkout repo (with submodules)
+   # 1) Fork’unu ve submodule’ü çek
+   - name: Checkout repo
      uses: actions/checkout@v4
      with:
-       submodules: recursive
-   - name: Build UI-builder image
+       submodules: recursive   # ./excalidraw submodule’unu da alır
+   # 2) (İsteğe bağlı) jcobol’daki docker-fix branch’ine geç
+   - name: Switch submodule to jcobol fix
      working-directory: excalidraw
      run: |
-       git checkout tags/v0.17.3
-       # Eğer reverse-proxy patch'in varsa:
-       git apply ../frontend.patch || true
-       # jcobol fix branch'ini de çekmek istersen:
-       git remote add jcobol https://github.com/jcobol/excalidraw
+       git remote add jcobol https://github.com/jcobol/excalidraw || true
        git fetch jcobol
-       git checkout 7582_fix_docker_build
-       # UI build için Docker image
-       docker build -t ui-builder . -f ui-build.Dockerfile
-   - name: Extract frontend static files
+       git checkout 7582_fix_docker_build || true
+   # 3) UI’yi ui-build.Dockerfile ile derleyen geçici imaj
+   - name: Build temporary UI image
+     run: docker build -t ui-builder ./excalidraw -f ui-build.Dockerfile
+   # 4) İmaj içindeki /frontend klasörünü çalışma alanına çıkar
+   - name: Extract frontend
      run: |
-       rm -rf frontend
-       mkdir frontend
-       docker run --rm \
-         -v ${{ github.workspace }}/frontend:/pwd \
-         ui-builder \
-         cp -r /frontend /pwd
-   - name: Set up Docker Buildx
+       docker create --name exui ui-builder
+       docker cp exui:/frontend ./frontend
+       docker rm exui
+   # 5) Docker Buildx
+   - name: Set up Buildx
      uses: docker/setup-buildx-action@v3
+   # 6) Docker Hub’a giriş
    - name: Login to DockerHub
      uses: docker/login-action@v3
      with:
        username: ${{ secrets.DOCKER_USERNAME }}
        password: ${{ secrets.DOCKER_PASSWORD }}
-   - name: Build and Push final image
+   # 7) Final imajı build + push
+   - name: Build & Push
      uses: docker/build-push-action@v5
      with:
        context: .
        push: true
-       tags: ${{ secrets.DOCKER_IMAGE }}
+       tags: ${{ secrets.DOCKER_IMAGE }}   # örn: myuser/excalidraw-complete:latest
