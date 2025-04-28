@@ -1,22 +1,19 @@
-# -------- STAGE 1 : Backend’i derle --------
+# ---------- 1. STAGE : backend'i derle ----------
 FROM golang:alpine AS backend
 RUN apk add --no-cache git
 WORKDIR /src
-# Go modüllerini indirin
 COPY go.mod go.sum ./
 RUN go mod download
-# Kaynak kodu kopyala ve statik ikili oluştur
 COPY . .
 RUN CGO_ENABLED=0 go build -o excalidraw-complete main.go
-# -------- STAGE 2 : Final imaj (Backend + UI) --------
+# ---------- 2. STAGE : final imaj (backend + UI) ----------
 FROM alpine
-# OpenShift rastgele UID’leri için yazılabilir dizin hazırla
+# OpenShift rastgele UID’leri için yazılabilir /app
 RUN mkdir /app && chgrp -R 0 /app && chmod -R g=u /app
 WORKDIR /app
-# Backend ikilisini kopyala
+# backend ikilisi
 COPY --from=backend /src/excalidraw-complete .
-# Frontend statik dosyalarını kopyala
-# (GitHub Actions, ./frontend dizinine “docker cp … /frontend/. ./frontend” ile koyuyor)
+# UI statik dosyaları (workflow’da ./frontend dizinine gelir)
 COPY frontend ./frontend
 EXPOSE 3002
 CMD ["./excalidraw-complete"]
