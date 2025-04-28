@@ -1,17 +1,17 @@
-name: Build UI & Push Docker image
+name: build-and-push
 on:
  push:
-   branches: [ dev ]        # başka branch kullanıyorsan değiştir
+   branches: [ main ]          # ihtiyaca göre değiştir
 jobs:
  docker:
    runs-on: ubuntu-latest
    steps:
-   # 1) Fork’unu ve submodule’ü çek
+   # 1) Fork + submodule
    - name: Checkout repo
      uses: actions/checkout@v4
      with:
-       submodules: recursive   # ./excalidraw submodule’unu da alır
-   # 2) (İsteğe bağlı) jcobol’daki docker-fix branch’ine geç
+       submodules: recursive
+   # 2) (İsteğe bağlı) jcobol fix branch’ine geç
    - name: Switch submodule to jcobol fix
      working-directory: excalidraw
      run: |
@@ -21,16 +21,17 @@ jobs:
    # 3) UI’yi ui-build.Dockerfile ile derleyen geçici imaj
    - name: Build temporary UI image
      run: docker build -t ui-builder ./excalidraw -f ui-build.Dockerfile
-   # 4) İmaj içindeki /frontend klasörünü çalışma alanına çıkar
+   # 4) UI statik dosyalarını çıkar  (/.  → içeriği kopyalar)
    - name: Extract frontend
      run: |
+       rm -rf frontend
        docker create --name exui ui-builder
-       docker cp exui:/frontend ./frontend
+       docker cp exui:/frontend/. ./frontend   # ← İÇERİĞİ kopyala, iç içe klasör yok
        docker rm exui
    # 5) Docker Buildx
    - name: Set up Buildx
      uses: docker/setup-buildx-action@v3
-   # 6) Docker Hub’a giriş
+   # 6) Docker Hub login
    - name: Login to DockerHub
      uses: docker/login-action@v3
      with:
