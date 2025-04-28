@@ -1,14 +1,26 @@
-name: Build and Push Docker Image
+name: Build and Push Excalidraw Complete with Frontend
 on:
  push:
    branches:
-     - dev  # veya default branch'ınız ne ise onu yazın
+     - main
 jobs:
  build-and-push:
    runs-on: ubuntu-latest
    steps:
-   - name: Checkout
+   - name: Checkout repo
      uses: actions/checkout@v4
+     with:
+       submodules: true  # submodule excalidraw'ı da çek!
+   - name: Setup Node.js
+     uses: actions/setup-node@v4
+     with:
+       node-version: '18'
+   - name: Install and Build Excalidraw Frontend
+     working-directory: excalidraw
+     run: |
+       npm install
+       npm run build
+       cp -r build ../frontend
    - name: Set up Docker Buildx
      uses: docker/setup-buildx-action@v3
    - name: Login to DockerHub
@@ -16,7 +28,7 @@ jobs:
      with:
        username: ${{ secrets.DOCKER_USERNAME }}
        password: ${{ secrets.DOCKER_PASSWORD }}
-   - name: Build and Push
+   - name: Build and Push Docker Image
      uses: docker/build-push-action@v5
      with:
        context: .
