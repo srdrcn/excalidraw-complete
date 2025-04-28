@@ -1,14 +1,16 @@
-FROM golang:alpine as builder
-RUN apk update && apk add --no-cache git
-WORKDIR /app
+# Önce Go ile derleme
+FROM golang:alpine AS builder
+RUN apk add --no-cache git
+WORKDIR /src
 COPY go.mod ./
-RUN GOPROXY=direct go mod download
+RUN go mod download
 COPY . .
-RUN GOPROXY=direct CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
-
+RUN CGO_ENABLED=0 go build -o excalidraw-complete main.go
+# Çalıştırma aşaması
 FROM alpine
-WORKDIR /root/
-COPY --from=builder /app/main .
-# COPY --from=builder /app/.env .
+RUN mkdir /app \
+&& chgrp -R 0 /app && chmod -R g=u /app
+WORKDIR /app
+COPY --from=builder /src/excalidraw-complete .  
 EXPOSE 3002
-CMD ["./main"]
+CMD ["./excalidraw-complete"]
